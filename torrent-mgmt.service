@@ -1,0 +1,29 @@
+[Unit]
+Description=Torrent management daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+User=torrent
+Group=torrent
+
+WorkingDirectory=/opt/torrent-mgmt
+
+EnvironmentFile=/etc/torrent-mgmt.env
+
+ExecStart=uv run python main.py
+
+Restart=always
+RestartSec=10
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/torrent-mgmt
+
+[Install]
+WantedBy=multi-user.target
+# vim: ft=systemd
