@@ -15,12 +15,8 @@ def getenv_required(name: str) -> str:
 
 
 TARGET_RATIO = float(getenv_required("TARGET_RATIO"))
-LOOP_INTERVAL_SECONDS = int(
-    getenv_required("LOOP_INTERVAL_SECONDS")
-)
-DELETE_FILES = (
-    getenv_required("DELETE_FILES").lower() == "true"
-)
+LOOP_INTERVAL_SECONDS = int(getenv_required("LOOP_INTERVAL_SECONDS"))
+DELETE_FILES = (getenv_required("DELETE_FILES").lower() == "true")
 
 
 def bytes_to_gib(x: int) -> float:
@@ -70,24 +66,16 @@ def should_delete(
     seeding_days = seconds_to_days(torrent.seeding_time)
     ratio = max(0.0, torrent.ratio or 0.0)
 
-    if torrent.progress < 0.999:
+    if torrent.progress < 0.999: # don't delete if torrent isn't fully downloaded
         return DeleteReason.DONT
 
-    if torrent.last_activity <= 0:
-        return DeleteReason.DONT
-
-    inactive_seconds = time.time() - torrent.last_activity
-
-    if inactive_seconds < 6 * 3600:
-        return DeleteReason.DONT
-
-    if ratio >= TARGET_RATIO:
+    if ratio >= TARGET_RATIO: # delete if target ratio is reached
         return DeleteReason.RATIO
 
-    if seeding_days >= timeout_days:
+    if seeding_days >= timeout_days: # delete if seeding time exceeds timeout
         return DeleteReason.TIMEOUT
 
-    return DeleteReason.DONT
+    return DeleteReason.DONT # keep seeding
 
 
 def main() -> int:
@@ -116,10 +104,16 @@ def main() -> int:
                             case DeleteReason.TIMEOUT:
                                 print(" (timeout)")
 
-                        client.torrents_delete(
-                            delete_files=DELETE_FILES,
-                            torrent_hashes=torrent.hash,
-                        )
+                        try:
+                            torrent.delete(
+                                delete_files=DELETE_FILES,
+                                torrent_hashes=torrent.hash,
+                            )
+                        except:
+                            print(
+                                f"Failed deleting torrent "
+                                f"{torrent.name} (hash: {torrent.hash})"
+                            )
 
                 except Exception as e:
                     print(
@@ -139,7 +133,8 @@ def main() -> int:
         except Exception as e:
             print(f"Unexpected error: {e}")
 
-        time.sleep(LOOP_INTERVAL_SECONDS)
+        finally:
+            time.sleep(LOOP_INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":
